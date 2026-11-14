@@ -23,6 +23,11 @@ jobs:
       # (підтверджено офіційною документацією: https://chaquo.com/chaquopy/doc/current/android.html).
       # ubuntu-latest вже має потрібний Android SDK попередньо встановлений.
 
+      - name: Set up Python 3.10 (потрібен Chaquopy на САМІЙ білд-машині для pip install)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
