@@ -32,12 +32,13 @@ jobs:
           "$SDKMANAGER" --install "ndk;26.1.10909125"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> "$GITHUB_ENV"
 
-      - name: Bootstrap Gradle wrapper
+      - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
 
-      - name: Generate gradlew (якщо wrapper ще не закомічено в репо)
+      - name: Generate gradlew (у репо його ще не закомічено)
         run: gradle wrapper --gradle-version 8.7
-        continue-on-error: true
 
       - name: Grant execute permission
         run: chmod +x ./gradlew
