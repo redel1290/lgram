@@ -57,6 +57,46 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Надіслати код" />
+
+        <Button
+            android:id="@+id/btnQrLogin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Увійти через QR-код" />
+    </LinearLayout>
+
+    <!-- Крок QR: картинка-код + статус очікування сканування -->
+    <LinearLayout
+        android:id="@+id/stepQr"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/ivQrCode"
+            android:layout_width="240dp"
+            android:layout_height="240dp"
+            android:background="#FFFFFF"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/tvQrStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#AEBACB"
+            android:textSize="14sp"
+            android:text="Відкрий Telegram на телефоні з активним акаунтом → Налаштування → Пристрої → Підключити пристрій, і відскануй цей код." />
+
+        <Button
+            android:id="@+id/btnQrBack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Назад" />
     </LinearLayout>
 
     <!-- Крок 2: код -->

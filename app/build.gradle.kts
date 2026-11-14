@@ -12,8 +12,8 @@ android {
         applicationId = "com.lgram.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0" // синхронізовано з version.properties, не редагувати вручну
+        versionCode = 3
+        versionName = "1.1.1" // синхронізовано з version.properties, не редагувати вручну
 
         ndk {
             // armeabi-v7a + arm64-v8a покривають майже всі реальні Android-пристрої.
@@ -80,5 +80,6 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.drawerlayout:drawerlayout:1.2.0")
     implementation("androidx.activity:activity-ktx:1.9.0")
+    implementation("com.google.zxing:core:3.5.3") // генерація QR-коду для входу
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

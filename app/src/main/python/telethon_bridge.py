@@ -46,6 +46,7 @@ def _ensure_runtime(account_id: str):
                 "loop": loop,
                 "thread": thread,
                 "phone_code_hash": None,
+                "qr_login": None,
             }
         return _accounts[account_id]
 
@@ -112,6 +113,64 @@ def sign_in_password(account_id: str, password: str) -> str:
     async def _do():
         await client.sign_in(password=password)
         return "OK"
+
+    try:
+        return _run(account_id, _do())
+    except Exception as e:
+        return "ERROR:" + str(e)
+
+
+def qr_login_start(account_id: str, session_path: str, api_id, api_hash: str) -> str:
+    """Запускає QR-вхід, повертає tg://login?token=... для показу як QR-код."""
+    client = _get_client(account_id, session_path, api_id, api_hash)
+
+    async def _do():
+        if not client.is_connected():
+            await client.connect()
+        qr = await client.qr_login()
+        _accounts[account_id]["qr_login"] = qr
+        return qr.url
+
+    try:
+        return _run(account_id, _do())
+    except Exception as e:
+        return "ERROR:" + str(e)
+
+
+def qr_login_wait(account_id: str, timeout_seconds: int = 20) -> str:
+    """OK | NEED_PASSWORD | EXPIRED | ERROR:<текст>.
+    EXPIRED означає, що токен протух (QR живе ~30с) — треба викликати
+    qr_login_recreate і показати новий QR, не починаючи все спочатку."""
+    runtime = _accounts.get(account_id)
+    qr = runtime.get("qr_login") if runtime else None
+    if qr is None:
+        return "ERROR:no_qr"
+
+    async def _do():
+        try:
+            await qr.wait(timeout_seconds)
+            return "OK"
+        except SessionPasswordNeededError:
+            return "NEED_PASSWORD"
+        except asyncio.TimeoutError:
+            return "EXPIRED"
+
+    try:
+        return _run(account_id, _do(), timeout=timeout_seconds + 15.0)
+    except Exception as e:
+        return "ERROR:" + str(e)
+
+
+def qr_login_recreate(account_id: str) -> str:
+    """Оновлює протухлий QR-токен, повертає нове посилання для нового QR-коду."""
+    runtime = _accounts.get(account_id)
+    qr = runtime.get("qr_login") if runtime else None
+    if qr is None:
+        return "ERROR:no_qr"
+
+    async def _do():
+        await qr.recreate()
+        return qr.url
 
     try:
         return _run(account_id, _do())

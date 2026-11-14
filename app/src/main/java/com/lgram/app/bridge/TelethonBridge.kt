@@ -43,6 +43,22 @@ object TelethonBridge {
             module.callAttr("sign_in_password", accountId, password).toString()
         }
 
+    suspend fun qrLoginStart(accountId: String, apiId: Long, apiHash: String): String =
+        withContext(Dispatchers.IO) {
+            val sessionPath = StorageManager.sessionPathFor(accountId)
+            module.callAttr("qr_login_start", accountId, sessionPath, apiId, apiHash).toString()
+        }
+
+    suspend fun qrLoginWait(accountId: String, timeoutSeconds: Int = 20): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("qr_login_wait", accountId, timeoutSeconds).toString()
+        }
+
+    suspend fun qrLoginRecreate(accountId: String): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("qr_login_recreate", accountId).toString()
+        }
+
     suspend fun checkAuthorized(accountId: String, apiId: Long, apiHash: String): Boolean =
         withContext(Dispatchers.IO) {
             val sessionPath = StorageManager.sessionPathFor(accountId)
