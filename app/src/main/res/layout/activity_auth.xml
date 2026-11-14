@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#17212B">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="lgram"
+        android:textColor="#FFFFFF"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="24dp" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#E8503A"
+        android:textSize="13sp"
+        android:layout_marginBottom="12dp"
+        android:visibility="gone" />
+
+    <!-- Назва акаунта в lgram (для твоєї власної зручності, не для Telegram) -->
+    <EditText
+        android:id="@+id/etAccountName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Назва акаунта в lgram (напр. «Мій», «Олег»)"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#6D7883"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Крок 1: телефон -->
+    <LinearLayout
+        android:id="@+id/stepPhone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <EditText
+            android:id="@+id/etPhone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Номер телефону (+380...)"
+            android:inputType="phone"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#6D7883"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnSendCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Надіслати код" />
+    </LinearLayout>
+
+    <!-- Крок 2: код -->
+    <LinearLayout
+        android:id="@+id/stepCode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/etCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Код із Telegram"
+            android:inputType="number"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#6D7883"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnConfirmCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Підтвердити код" />
+    </LinearLayout>
+
+    <!-- Крок 3: 2FA пароль (лише якщо увімкнено) -->
+    <LinearLayout
+        android:id="@+id/stepPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/etPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Пароль двофакторної автентифікації"
+            android:inputType="textPassword"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#6D7883"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnConfirmPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Увійти" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="24dp"
+        android:visibility="gone" />
+
+</LinearLayout>

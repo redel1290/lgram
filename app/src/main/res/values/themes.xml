@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.Lgram" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#5B8DEF</item>
+        <item name="colorPrimaryDark">#17212B</item>
+        <item name="colorAccent">#5B8DEF</item>
+        <item name="android:windowBackground">#0E1621</item>
+    </style>
+</resources>
