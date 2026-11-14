@@ -37,7 +37,7 @@ jobs:
       - name: Read version
         id: ver
         run: |
-          VERSION=$(grep versionName version.properties | cut -d'=' -f2)
+          VERSION=$(grep -E '^versionName=' version.properties | cut -d'=' -f2)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build debug APK
