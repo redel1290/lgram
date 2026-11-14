@@ -7,7 +7,6 @@ plugins {
 android {
     namespace = "com.lgram.app"
     compileSdk = 34
-    ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.lgram.app"
@@ -17,15 +16,9 @@ android {
         versionName = "1.0.0" // синхронізовано з version.properties, не редагувати вручну
 
         ndk {
-            // armeabi-v7a + arm64-v8a покривають майже всі реальні Android-пристрої
+            // armeabi-v7a + arm64-v8a покривають майже всі реальні Android-пристрої.
+            // NDK саму ставити не треба — нативні бібліотеки Chaquopy вже готові.
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
-        }
-
-        python {
-            version = "3.11"
-            pip {
-                install("telethon")
-            }
         }
     }
 
@@ -49,6 +42,14 @@ android {
 
     buildFeatures {
         viewBinding = true
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        pip {
+            install("telethon")
+        }
     }
 }
 

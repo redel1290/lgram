@@ -19,18 +19,9 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install NDK (потрібен Chaquopy для нативного Python-рантайму)
-        # ubuntu-latest вже має Android SDK попередньо встановлений (ANDROID_HOME заданий
-        # раннером), тому окремий setup-android крок не потрібен і лише спричиняє помилку
-        # через застарілий пакет 'tools', якого вже нема в репозиторії Google.
-        run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -f "$SDKMANAGER" ]; then
-            SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n1)
-          fi
-          yes | "$SDKMANAGER" --licenses || true
-          "$SDKMANAGER" --install "ndk;26.1.10909125"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> "$GITHUB_ENV"
+      # NDK окремо ставити не треба — усі нативні бібліотеки Chaquopy вже готові
+      # (підтверджено офіційною документацією: https://chaquo.com/chaquopy/doc/current/android.html).
+      # ubuntu-latest вже має потрібний Android SDK попередньо встановлений.
 
       - name: Install Gradle
         uses: gradle/actions/setup-gradle@v4
