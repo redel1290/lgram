@@ -48,6 +48,11 @@ android {
 chaquopy {
     defaultConfig {
         pip {
+            // pyaes (залежність Telethon) не має готового .whl на PyPI, лише вихідний
+            // код, а pip у Chaquopy 17+ не збирає пакети з вихідників — тому тут
+            // підсовуємо власноруч зібраний локальний wheel (чистий Python, без
+            // платформозалежного коду, тому збирається без проблем).
+            install("wheels/pyaes-1.6.1-py3-none-any.whl")
             install("telethon")
         }
     }
