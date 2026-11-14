@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0E1621">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="#17212B"
+            app:titleTextColor="#FFFFFF"
+            app:title="Налаштування" />
+
+        <!-- Профіль поточного акаунта -->
+        <TextView style="@style/SettingsSectionTitle" android:text="Профіль (поточний акаунт)" />
+
+        <EditText android:id="@+id/etFirstName" style="@style/SettingsInput" android:hint="Ім'я" />
+        <EditText android:id="@+id/etLastName" style="@style/SettingsInput" android:hint="Прізвище" />
+        <EditText android:id="@+id/etBio" style="@style/SettingsInput" android:hint="Про себе" />
+
+        <Button
+            android:id="@+id/btnSaveProfile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:text="Зберегти профіль" />
+
+        <View style="@style/SettingsDivider" />
+
+        <!-- API ID / hash -->
+        <TextView style="@style/SettingsSectionTitle" android:text="API ID / API hash за замовчуванням" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Використовується для нових акаунтів. Зміни тут допоможуть, якщо поточна пара тимчасово заблокована Telegram."
+            android:textColor="#6D7883"
+            android:textSize="12sp"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="8dp" />
+
+        <EditText android:id="@+id/etApiId" style="@style/SettingsInput" android:hint="API ID" android:inputType="number" />
+        <EditText android:id="@+id/etApiHash" style="@style/SettingsInput" android:hint="API hash" />
+
+        <Button
+            android:id="@+id/btnSaveCredentials"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:text="Зберегти" />
+
+        <View style="@style/SettingsDivider" />
+
+        <!-- Акаунти: експорт / видалення файлу сесії -->
+        <TextView style="@style/SettingsSectionTitle" android:text="Акаунти lgram" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvAccountsSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false" />
+
+    </LinearLayout>
+</ScrollView>

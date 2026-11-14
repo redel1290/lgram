@@ -57,4 +57,49 @@ object TelethonBridge {
     suspend fun disconnect(accountId: String) = withContext(Dispatchers.IO) {
         module.callAttr("disconnect", accountId)
     }
+
+    suspend fun getDialogs(accountId: String, limit: Int = 50): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("get_dialogs", accountId, limit).toString()
+        }
+
+    suspend fun getMessages(accountId: String, chatId: Long, limit: Int = 40, offsetId: Int = 0): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("get_messages", accountId, chatId, limit, offsetId).toString()
+        }
+
+    suspend fun sendText(accountId: String, chatId: Long, text: String): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("send_text", accountId, chatId, text).toString()
+        }
+
+    suspend fun downloadMedia(accountId: String, chatId: Long, messageId: Int, destDir: String): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("download_media", accountId, chatId, messageId, destDir).toString()
+        }
+
+    suspend fun forwardMessage(accountId: String, fromChatId: Long, messageId: Int, toChatId: Long): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("forward_message", accountId, fromChatId, messageId, toChatId).toString()
+        }
+
+    suspend fun editMessage(accountId: String, chatId: Long, messageId: Int, newText: String): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("edit_message", accountId, chatId, messageId, newText).toString()
+        }
+
+    suspend fun deleteMessage(accountId: String, chatId: Long, messageId: Int): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("delete_message", accountId, chatId, messageId).toString()
+        }
+
+    suspend fun getProfile(accountId: String): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("get_profile", accountId).toString()
+        }
+
+    suspend fun updateProfile(accountId: String, firstName: String, lastName: String, bio: String): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("update_profile", accountId, firstName, lastName, bio).toString()
+        }
 }

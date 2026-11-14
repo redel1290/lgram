@@ -8,6 +8,7 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.appcompat.app.AppCompatActivity
 import com.lgram.app.databinding.ActivityStoragePermissionBinding
+import com.lgram.app.storage.AccountRegistry
 import com.lgram.app.storage.StorageManager
 import com.lgram.app.ui.main.MainActivity
 
@@ -64,9 +65,9 @@ class StoragePermissionActivity : AppCompatActivity() {
 
     private fun proceed() {
         StorageManager.ensureStructure()
-        // MainActivity спочатку перевіряє папку sessions/ та імпортує готові сесії.
-        // Якщо там нічого немає і реєстр порожній, вона сама відкриє AuthActivity.
-        startActivity(Intent(this, MainActivity::class.java))
+        val hasActiveAccounts = AccountRegistry.loadAll().isNotEmpty()
+        val next = if (hasActiveAccounts) MainActivity::class.java else AuthActivity::class.java
+        startActivity(Intent(this, next))
         finish()
     }
 }

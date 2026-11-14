@@ -23,8 +23,6 @@ object StorageManager {
         get() = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "lgram")
 
     val accountsDir: File get() = File(root, "accounts")
-    /** Сюди можна вручну копіювати готові Telethon-файли *.session для імпорту. */
-    val sessionsImportDir: File get() = File(root, "sessions")
     val configDir: File get() = File(root, "config")
     val downloadsDir: File get() = File(root, "downloads")
     val cacheDir: File get() = File(root, "cache")
@@ -35,7 +33,7 @@ object StorageManager {
 
     /** Викликати один раз при старті застосунку — створює всю структуру, якщо її ще нема. */
     fun ensureStructure() {
-        listOf(root, accountsDir, sessionsImportDir, configDir, downloadsDir, cacheDir, logsDir).forEach {
+        listOf(root, accountsDir, configDir, downloadsDir, cacheDir, logsDir).forEach {
             if (!it.exists()) it.mkdirs()
         }
     }

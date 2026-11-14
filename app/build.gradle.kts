@@ -12,13 +12,26 @@ android {
         applicationId = "com.lgram.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0" // синхронізовано з version.properties, не редагувати вручну
+        versionCode = 2
+        versionName = "1.1.0" // синхронізовано з version.properties, не редагувати вручну
 
         ndk {
             // armeabi-v7a + arm64-v8a покривають майже всі реальні Android-пристрої.
             // NDK саму ставити не треба — нативні бібліотеки Chaquopy вже готові.
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            // Фіксований debug-keystore (закомічений у keystore/debug.keystore), щоб
+            // кожна збірка з GitHub Actions мала ОДНАКОВИЙ підпис — інакше раннер щоразу
+            // генерує новий debug.keystore, Android бачить нову збірку як "інший застосунок"
+            // і вимагає видалити попередню перед встановленням (а разом з нею — дозвіл на сховище).
+            storeFile = file("../keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
@@ -66,5 +79,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.drawerlayout:drawerlayout:1.2.0")
+    implementation("androidx.activity:activity-ktx:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

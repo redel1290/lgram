@@ -11,17 +11,19 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.lgram.app.bridge.TelethonBridge
 import com.lgram.app.databinding.ActivityMainBinding
 import com.lgram.app.model.Account
-import com.lgram.app.storage.StorageManager
+import com.lgram.app.model.Dialog
 import com.lgram.app.storage.AccountRegistry
 import com.lgram.app.ui.auth.AuthActivity
+import com.lgram.app.ui.chat.ChatActivity
+import com.lgram.app.ui.settings.SettingsActivity
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var accountsAdapter: AccountsAdapter
+    private lateinit var chatsAdapter: ChatsAdapter
     private var activeAccountId: String? = null
-    private var refreshingAccounts = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,10 +45,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.menuSettings.setOnClickListener {
-            Toast.makeText(this, "Налаштування з'являться у наступній версії", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
-        binding.rvChats.visibility = View.GONE // поки немає чатів — див. v1.1.0
+        chatsAdapter = ChatsAdapter(emptyList()) { dialog -> onChatClicked(dialog) }
+        binding.rvChats.layoutManager = LinearLayoutManager(this)
+        binding.rvChats.adapter = chatsAdapter
+
         refreshAccounts()
     }
 
@@ -56,87 +61,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshAccounts() {
-        if (refreshingAccounts) return
-        refreshingAccounts = true
-
-        lifecycleScope.launch {
-            try {
-                importDroppedSessions()
-
-                val accounts = AccountRegistry.loadAll()
-                accountsAdapter.update(accounts)
-                if (accounts.isEmpty()) {
-                    startActivity(Intent(this@MainActivity, AuthActivity::class.java))
-                    finish()
-                    return@launch
-                }
-
-                if (activeAccountId == null) {
-                    activeAccountId = accounts.firstOrNull { it.active }?.id ?: accounts.first().id
-                    supportActionBar?.title = accounts.find { it.id == activeAccountId }?.name ?: "lgram"
-                }
-
-                // Перевіряємо сесії у фоні та оновлюємо їхній статус у реєстрі.
-                accounts.forEach { acc ->
-                    val alive = TelethonBridge.checkAuthorized(acc.id, acc.apiId, acc.apiHash)
-                    if (alive != acc.active) AccountRegistry.setActive(acc.id, alive)
-                }
-                accountsAdapter.update(AccountRegistry.loadAll())
-            } finally {
-                refreshingAccounts = false
-            }
+        val accounts = AccountRegistry.loadAll()
+        accountsAdapter.update(accounts)
+        if (accounts.isEmpty()) {
+            startActivity(Intent(this, AuthActivity::class.java))
+            finish()
+            return
         }
-    }
-
-    /** Імпорт готових Telethon *.session із /Download/lgram/sessions. */
-    private suspend fun importDroppedSessions() {
-        StorageManager.ensureStructure()
-        val sessionFiles = StorageManager.sessionsImportDir.listFiles()
-            ?.filter { it.isFile && it.extension.equals("session", ignoreCase = true) }
-            .orEmpty()
-        if (sessionFiles.isEmpty()) return
-
-        val creds = AccountRegistry.loadOrCreateDefaultCredentials(
-            defaultApiId = 39965259L,
-            defaultApiHash = "3c5a8b106e8180896c741810b844fdc4"
-        )
-
-        sessionFiles.forEach { source ->
-            val accountId = AccountRegistry.newAccountId()
-            val target = StorageManager.sessionFileFor(accountId)
-            try {
-                source.copyTo(target, overwrite = true)
-                val authorized = TelethonBridge.checkAuthorized(accountId, creds.apiId, creds.apiHash)
-                if (authorized) {
-                    val accountName = TelethonBridge.getMeName(accountId)
-                        .ifBlank { source.nameWithoutExtension }
-                    val existingCount = AccountRegistry.loadAll().size
-                    AccountRegistry.add(
-                        Account(
-                            id = accountId,
-                            name = accountName,
-                            phone = source.nameWithoutExtension,
-                            apiId = creds.apiId,
-                            apiHash = creds.apiHash,
-                            colorHex = AccountRegistry.nextDefaultColor(existingCount),
-                            active = true
-                        )
-                    )
-                    // Оригінал прибираємо лише після успішного додавання до реєстру.
-                    source.delete()
-                    StorageManager.log("SessionImport", "Імпортовано ${source.name}")
-                } else {
-                    TelethonBridge.disconnect(accountId)
-                    target.delete()
-                    StorageManager.log("SessionImport", "Сесію ${source.name} не вдалося авторизувати")
+        if (activeAccountId == null) {
+            activeAccountId = accounts.firstOrNull { it.active }?.id ?: accounts.first().id
+            supportActionBar?.title = accounts.find { it.id == activeAccountId }?.name ?: "lgram"
+            loadChats()
+        }
+        // Фонова перевірка живучості сесій — якщо якась відвалилась, позначаємо неактивною,
+        // АЛЕ ніколи не видаляємо файл сам по собі (це робить лише сам юзер у налаштуваннях).
+        lifecycleScope.launch {
+            accounts.forEach { acc ->
+                val alive = TelethonBridge.checkAuthorized(acc.id, acc.apiId, acc.apiHash)
+                if (alive != acc.active) {
+                    AccountRegistry.setActive(acc.id, alive)
                 }
-            } catch (e: Exception) {
-                try {
-                    TelethonBridge.disconnect(accountId)
-                    target.delete()
-                } catch (_: Exception) { }
-                StorageManager.log("SessionImport", "Помилка імпорту ${source.name}: ${e.message}")
             }
+            accountsAdapter.update(AccountRegistry.loadAll())
         }
     }
 
@@ -148,6 +94,37 @@ class MainActivity : AppCompatActivity() {
         activeAccountId = account.id
         supportActionBar?.title = account.name
         binding.drawerLayout.closeDrawers()
-        // Тут у наступній версії буде завантаження списку чатів саме цього акаунта
+        loadChats()
+    }
+
+    private fun loadChats() {
+        val accountId = activeAccountId ?: return
+        binding.tvEmptyState.text = "Завантаження чатів…"
+        binding.tvEmptyState.visibility = View.VISIBLE
+        binding.rvChats.visibility = View.GONE
+
+        lifecycleScope.launch {
+            val json = TelethonBridge.getDialogs(accountId)
+            val dialogs = Dialog.listFromJson(json)
+            if (dialogs.isEmpty()) {
+                binding.tvEmptyState.text = "Чатів не знайдено, або сталась помилка завантаження."
+                binding.tvEmptyState.visibility = View.VISIBLE
+                binding.rvChats.visibility = View.GONE
+            } else {
+                binding.tvEmptyState.visibility = View.GONE
+                binding.rvChats.visibility = View.VISIBLE
+                chatsAdapter.update(dialogs)
+            }
+        }
+    }
+
+    private fun onChatClicked(dialog: Dialog) {
+        val accountId = activeAccountId ?: return
+        val intent = Intent(this, ChatActivity::class.java).apply {
+            putExtra(ChatActivity.EXTRA_ACCOUNT_ID, accountId)
+            putExtra(ChatActivity.EXTRA_CHAT_ID, dialog.id)
+            putExtra(ChatActivity.EXTRA_CHAT_NAME, dialog.name)
+        }
+        startActivity(intent)
     }
 }
