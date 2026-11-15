@@ -69,6 +69,7 @@ class ChatActivity : AppCompatActivity() {
         binding.btnAttach.setOnClickListener { pickFileLauncher.launch("*/*") }
 
         loadMessages()
+        lifecycleScope.launch { TelethonBridge.markRead(accountId, chatId) }
     }
 
     override fun onResume() {

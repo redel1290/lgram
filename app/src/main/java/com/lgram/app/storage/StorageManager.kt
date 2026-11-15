@@ -58,6 +58,10 @@ object StorageManager {
     fun avatarFileFor(accountId: String, key: String): File =
         File(avatarsDir, "${accountId}_${key}.jpg")
 
+    /** Кеш "сирого" JSON списку чатів — щоб при відкритті застосунку показати
+     *  список МИТТЄВО (зі вчорашнього кешу), а не чекати мережевого запиту. */
+    fun dialogsCacheFile(accountId: String): File = File(cacheDir, "dialogs_$accountId.json")
+
     fun log(tag: String, message: String) {
         try {
             ensureStructure()

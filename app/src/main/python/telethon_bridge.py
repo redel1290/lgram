@@ -22,6 +22,7 @@ from telethon.tl.types import (
     MessageMediaPhoto, MessageMediaDocument, DocumentAttributeVideo,
     DocumentAttributeAudio, DocumentAttributeSticker, DocumentAttributeAnimated,
 )
+from telethon.tl.functions.messages import GetPeerDialogsRequest
 
 # account_id -> {"client": TelegramClient, "loop": asyncio.AbstractEventLoop,
 #                "thread": Thread, "phone_code_hash": str | None}
@@ -58,9 +59,19 @@ def _run(account_id: str, coro, timeout: float = 60.0):
 
 
 def _get_client(account_id: str, session_path: str, api_id, api_hash: str) -> TelegramClient:
+    """Представляємось як реальний Android-клієнт (а не дефолтний
+    'python-telegram' signature Telethon) — це знижує ризик, що Telegram
+    розцінить сесію як підозрілу лише через очевидну бібліотечну сигнатуру."""
     runtime = _ensure_runtime(account_id)
     if runtime["client"] is None:
-        runtime["client"] = TelegramClient(session_path, int(api_id), api_hash, loop=runtime["loop"])
+        runtime["client"] = TelegramClient(
+            session_path, int(api_id), api_hash, loop=runtime["loop"],
+            device_model="Samsung Galaxy S23",
+            system_version="Android 14",
+            app_version="11.2.0",
+            lang_code="uk",
+            system_lang_code="uk-UA",
+        )
     return runtime["client"]
 
 
@@ -246,7 +257,19 @@ def _detect_media_type(message) -> str:
     return "document"
 
 
-def _message_to_dict(message, me_id) -> dict:
+async def _get_read_outbox_max_id(client, chat_id: int) -> int:
+    """До якого id співрозмовник прочитав НАШІ повідомлення — саме це
+    визначає одну чи дві галочки, як у звичайному Telegram."""
+    try:
+        result = await client(GetPeerDialogsRequest(peers=[chat_id]))
+        if result.dialogs:
+            return result.dialogs[0].read_outbox_max_id
+    except Exception:
+        pass
+    return 0
+
+
+def _message_to_dict(message, read_outbox_max_id: int) -> dict:
     sender_name = ""
     try:
         sender = message.sender
@@ -273,6 +296,7 @@ def _message_to_dict(message, me_id) -> dict:
         "mediaType": media_type,
         "mediaFilename": filename,
         "isEdited": bool(message.edit_date),
+        "isRead": bool(message.out and message.id <= read_outbox_max_id),
     }
 
 
@@ -310,16 +334,33 @@ def get_messages(account_id: str, chat_id: int, limit: int = 40, offset_id: int 
         return json.dumps({"error": "no_client"})
 
     async def _do():
-        me = await client.get_me()
+        read_outbox_max_id = await _get_read_outbox_max_id(client, chat_id)
         result = []
         async for m in client.iter_messages(chat_id, limit=limit, offset_id=offset_id):
-            result.append(_message_to_dict(m, me.id))
+            result.append(_message_to_dict(m, read_outbox_max_id))
         return result
 
     try:
         return json.dumps(_run(account_id, _do(), timeout=30.0))
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+def mark_read(account_id: str, chat_id: int) -> str:
+    """Позначає чат прочитаним — і на боці Telegram (зникає непрочитане на
+    інших пристроях теж), і для нашого ж списку чатів."""
+    client = _active_client(account_id)
+    if client is None:
+        return "ERROR:no_client"
+
+    async def _do():
+        await client.send_read_acknowledge(chat_id)
+        return "OK"
+
+    try:
+        return _run(account_id, _do(), timeout=15.0)
+    except Exception as e:
+        return "ERROR:" + str(e)
 
 
 def send_text(account_id: str, chat_id: int, text: str) -> str:

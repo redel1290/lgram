@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setSupportActionBar(binding.toolbar)
-        binding.toolbar.setNavigationIcon(android.R.drawable.ic_menu_sort_by_size)
+        binding.toolbar.setNavigationIcon(com.lgram.app.R.drawable.ic_hamburger)
         binding.toolbar.setNavigationOnClickListener {
             binding.drawerLayout.openDrawer(Gravity.START)
         }
@@ -141,17 +141,32 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadChats(silent: Boolean = false) {
         val accountId = activeAccountId ?: return
+
         if (!silent) {
-            binding.tvEmptyState.text = "Завантаження чатів…"
-            binding.tvEmptyState.visibility = View.VISIBLE
-            binding.rvChats.visibility = View.GONE
+            // Миттєво показуємо те, що закешоване з минулого разу, поки йде
+            // реальний запит у мережу — саме це прибирає відчуття "довго грузить".
+            val cacheFile = StorageManager.dialogsCacheFile(accountId)
+            if (cacheFile.exists()) {
+                try {
+                    allDialogs = Dialog.listFromJson(cacheFile.readText())
+                    showDialogs()
+                } catch (_: Exception) { /* кеш пошкоджений — просто покажемо завантаження нижче */ }
+            }
+            if (allDialogs.isEmpty()) {
+                binding.tvEmptyState.text = "Завантаження чатів…"
+                binding.tvEmptyState.visibility = View.VISIBLE
+                binding.rvChats.visibility = View.GONE
+            }
         }
 
         lifecycleScope.launch {
             val json = TelethonBridge.getDialogs(accountId)
             val dialogs = Dialog.listFromJson(json)
-            allDialogs = dialogs
-            showDialogs()
+            if (dialogs.isNotEmpty()) {
+                allDialogs = dialogs
+                showDialogs()
+                try { StorageManager.dialogsCacheFile(accountId).writeText(json) } catch (_: Exception) {}
+            }
         }
     }
 
@@ -192,6 +207,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun onChatClicked(dialog: Dialog) {
         val accountId = activeAccountId ?: return
+        // Оптимістично скидаємо "непрочитане" одразу в інтерфейсі — не чекаючи,
+        // поки сервер підтвердить це при наступному опитуванні.
+        if (dialog.unreadCount > 0) {
+            allDialogs = allDialogs.map { if (it.id == dialog.id) it.copy(unreadCount = 0) else it }
+            showDialogs()
+        }
         val intent = Intent(this, ChatActivity::class.java).apply {
             putExtra(ChatActivity.EXTRA_ACCOUNT_ID, accountId)
             putExtra(ChatActivity.EXTRA_CHAT_ID, dialog.id)

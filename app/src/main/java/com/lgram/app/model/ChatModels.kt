@@ -43,7 +43,8 @@ data class ChatMessage(
     val date: Long,
     val mediaType: String, // "", photo, video, video_note, voice, audio, sticker, gif, document
     val mediaFilename: String,
-    val isEdited: Boolean
+    val isEdited: Boolean,
+    val isRead: Boolean
 ) {
     companion object {
         fun listFromJson(json: String): List<ChatMessage> {
@@ -59,7 +60,8 @@ data class ChatMessage(
                         date = o.optLong("date", 0),
                         mediaType = o.optString("mediaType", ""),
                         mediaFilename = o.optString("mediaFilename", ""),
-                        isEdited = o.optBoolean("isEdited", false)
+                        isEdited = o.optBoolean("isEdited", false),
+                        isRead = o.optBoolean("isRead", false)
                     )
                 }
             } catch (e: Exception) {

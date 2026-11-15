@@ -84,6 +84,11 @@ object TelethonBridge {
             module.callAttr("get_messages", accountId, chatId, limit, offsetId).toString()
         }
 
+    suspend fun markRead(accountId: String, chatId: Long): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("mark_read", accountId, chatId).toString()
+        }
+
     suspend fun sendText(accountId: String, chatId: Long, text: String): String =
         withContext(Dispatchers.IO) {
             module.callAttr("send_text", accountId, chatId, text).toString()

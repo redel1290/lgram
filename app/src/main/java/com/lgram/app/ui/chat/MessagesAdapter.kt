@@ -47,7 +47,11 @@ class MessagesAdapter(
 
         val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         val timeText = if (m.date > 0) sdf.format(Date(m.date * 1000)) else ""
-        b.tvMeta.text = if (m.isEdited) "ред. $timeText" else timeText
+        val editedPrefix = if (m.isEdited) "ред. " else ""
+        // Галочки лише для власних повідомлень, як у Telegram: ✓ — надіслано,
+        // ✓✓ — прочитано співрозмовником.
+        val checkmark = if (m.out) (if (m.isRead) " ✓✓" else " ✓") else ""
+        b.tvMeta.text = "$editedPrefix$timeText$checkmark"
 
         b.bubble.setOnClickListener { onTap(m) }
         b.bubble.setOnLongClickListener { onLongPress(m); true }
