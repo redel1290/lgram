@@ -17,6 +17,7 @@ import com.lgram.app.ui.main.MainActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /**
  * Штатний вхід Telethon: номер телефону -> код з Telegram -> (якщо є 2FA) пароль.
@@ -57,10 +58,9 @@ class AuthActivity : AppCompatActivity() {
     }
 
     private fun onSendCode() {
-        val name = binding.etAccountName.text.toString().trim()
         val phone = binding.etPhone.text.toString().trim()
-        if (name.isEmpty() || phone.isEmpty()) {
-            showError("Вкажи назву акаунта та номер телефону")
+        if (phone.isEmpty()) {
+            showError("Вкажи номер телефону")
             return
         }
 
@@ -131,11 +131,6 @@ class AuthActivity : AppCompatActivity() {
     // ---- Вхід через QR-код (альтернатива коду в SMS/Telegram, логіка номер+код не чіпається) ----
 
     private fun onStartQrLogin() {
-        val name = binding.etAccountName.text.toString().trim()
-        if (name.isEmpty()) {
-            showError("Вкажи назву акаунта перед входом через QR")
-            return
-        }
         val creds = AccountRegistry.loadOrCreateDefaultCredentials(39965259L, "3c5a8b106e8180896c741810b844fdc4")
         val accountId = AccountRegistry.newAccountId()
         pendingAccountId = accountId
@@ -214,24 +209,52 @@ class AuthActivity : AppCompatActivity() {
         binding.stepPhone.visibility = View.VISIBLE
     }
 
+    /**
+     * Ім'я й телефон акаунта беремо ВИКЛЮЧНО зі справжнього профілю Telegram
+     * (через get_profile одразу після входу) — ніколи з довільного тексту, який
+     * юзер міг би вписати сам. Довільне "ім'я" в lgram, що не збігається зі
+     * справжнім акаунтом, — це саме та дрібниця, через яку Telegram може
+     * розцінити клієнт як підозрілий і тимчасово обмежити акаунт.
+     */
     private fun finishLogin(accountId: String) {
-        val name = binding.etAccountName.text.toString().trim()
-        val existingCount = AccountRegistry.loadAll().size
-        val creds = AccountRegistry.loadOrCreateDefaultCredentials(39965259L, "3c5a8b106e8180896c741810b844fdc4")
+        setLoading(true)
+        lifecycleScope.launch {
+            val creds = AccountRegistry.loadOrCreateDefaultCredentials(39965259L, "3c5a8b106e8180896c741810b844fdc4")
+            var realName = pendingPhone.ifBlank { "Акаунт" }
+            var realPhone = pendingPhone
 
-        AccountRegistry.add(
-            Account(
-                id = accountId,
-                name = name,
-                phone = pendingPhone,
-                apiId = creds.apiId,
-                apiHash = creds.apiHash,
-                colorHex = AccountRegistry.nextDefaultColor(existingCount),
-                active = true
+            try {
+                val profileJson = TelethonBridge.getProfile(accountId)
+                val o = JSONObject(profileJson)
+                if (!o.has("error")) {
+                    val first = o.optString("firstName", "")
+                    val last = o.optString("lastName", "")
+                    val full = (first + " " + last).trim()
+                    if (full.isNotBlank()) realName = full
+                    val phone = o.optString("phone", "")
+                    if (phone.isNotBlank()) realPhone = "+$phone"
+                }
+            } catch (_: Exception) {
+                // якщо профіль не підтягнувся — лишаємо запасний варіант вище,
+                // це не критично для самого факту успішного входу
+            }
+
+            val existingCount = AccountRegistry.loadAll().size
+            AccountRegistry.add(
+                Account(
+                    id = accountId,
+                    name = realName,
+                    phone = realPhone,
+                    apiId = creds.apiId,
+                    apiHash = creds.apiHash,
+                    colorHex = AccountRegistry.nextDefaultColor(existingCount),
+                    active = true
+                )
             )
-        )
 
-        startActivity(Intent(this, MainActivity::class.java))
-        finish()
+            setLoading(false)
+            startActivity(Intent(this@AuthActivity, MainActivity::class.java))
+            finish()
+        }
     }
 }

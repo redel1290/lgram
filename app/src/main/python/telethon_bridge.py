@@ -276,8 +276,9 @@ def _message_to_dict(message, me_id) -> dict:
     }
 
 
-def get_dialogs(account_id: str, limit: int = 50) -> str:
-    """Повертає JSON-список чатів поточного акаунта."""
+def get_dialogs(account_id: str, limit: int = 100) -> str:
+    """Повертає JSON-список чатів поточного акаунта (включно з архівними —
+    розділення на вкладки "Усі"/"Архів" робиться вже на боці Kotlin)."""
     client = _active_client(account_id)
     if client is None:
         return json.dumps({"error": "no_client"})
@@ -292,6 +293,7 @@ def get_dialogs(account_id: str, limit: int = 50) -> str:
                 "lastDate": int(d.date.timestamp()) if d.date else 0,
                 "unreadCount": d.unread_count,
                 "isGroup": bool(d.is_group or d.is_channel),
+                "archived": bool(getattr(d, "archived", False)),
             })
         return result
 
@@ -350,6 +352,14 @@ def download_media(account_id: str, chat_id: int, message_id: int, dest_dir: str
         path = await client.download_media(message, file=dest_dir + os.sep)
         if path is None:
             return "ERROR:download_failed"
+        # Перейменовуємо з префіксом message_id, щоб Kotlin-сторона могла перевірити
+        # наявність файлу в кеші ДО повторного завантаження (не якати один і той
+        # самий файл повторно щоразу при відкритті).
+        base = os.path.basename(path)
+        if not base.startswith(f"{message_id}_"):
+            new_path = os.path.join(dest_dir, f"{message_id}_{base}")
+            os.replace(path, new_path)
+            path = new_path
         return path
 
     try:
@@ -399,6 +409,44 @@ def delete_message(account_id: str, chat_id: int, message_id: int) -> str:
 
     try:
         return _run(account_id, _do())
+    except Exception as e:
+        return "ERROR:" + str(e)
+
+
+def download_avatar(account_id: str, entity_ref: str, dest_path: str) -> str:
+    """entity_ref: 'me' для власного фото акаунта, або id чату/користувача рядком.
+    Повертає шлях до збереженого файлу, 'NONE' якщо фото нема, або ERROR:<текст>."""
+    client = _active_client(account_id)
+    if client is None:
+        return "ERROR:no_client"
+
+    async def _do():
+        if entity_ref == "me":
+            entity = await client.get_me()
+        else:
+            entity = await client.get_entity(int(entity_ref))
+        if not getattr(entity, "photo", None):
+            return "NONE"
+        path = await client.download_profile_photo(entity, file=dest_path)
+        return path if path else "NONE"
+
+    try:
+        return _run(account_id, _do(), timeout=30.0)
+    except Exception as e:
+        return "ERROR:" + str(e)
+
+
+def send_file(account_id: str, chat_id: int, file_path: str, caption: str = "") -> str:
+    client = _active_client(account_id)
+    if client is None:
+        return "ERROR:no_client"
+
+    async def _do():
+        await client.send_file(chat_id, file_path, caption=caption)
+        return "OK"
+
+    try:
+        return _run(account_id, _do(), timeout=180.0)
     except Exception as e:
         return "ERROR:" + str(e)
 

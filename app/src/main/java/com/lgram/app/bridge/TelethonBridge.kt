@@ -109,6 +109,16 @@ object TelethonBridge {
             module.callAttr("delete_message", accountId, chatId, messageId).toString()
         }
 
+    suspend fun downloadAvatar(accountId: String, entityRef: String, destPath: String): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("download_avatar", accountId, entityRef, destPath).toString()
+        }
+
+    suspend fun sendFile(accountId: String, chatId: Long, filePath: String, caption: String = ""): String =
+        withContext(Dispatchers.IO) {
+            module.callAttr("send_file", accountId, chatId, filePath, caption).toString()
+        }
+
     suspend fun getProfile(accountId: String): String =
         withContext(Dispatchers.IO) {
             module.callAttr("get_profile", accountId).toString()

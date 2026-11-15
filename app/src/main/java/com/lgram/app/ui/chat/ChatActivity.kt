@@ -1,9 +1,12 @@
 package com.lgram.app.ui.chat
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.widget.EditText
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -14,8 +17,14 @@ import com.lgram.app.databinding.ActivityChatBinding
 import com.lgram.app.model.ChatMessage
 import com.lgram.app.model.Dialog
 import com.lgram.app.storage.StorageManager
+import com.lgram.app.ui.ActionSheet
+import com.lgram.app.ui.ActionItem
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileOutputStream
 
 class ChatActivity : AppCompatActivity() {
 
@@ -25,6 +34,12 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var accountId: String
     private var chatId: Long = 0
     private var chatName: String = ""
+    private var pollJob: Job? = null
+    private var lastMessageIds: List<Int> = emptyList()
+
+    private val pickFileLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) onFilePicked(uri)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,14 +66,42 @@ class ChatActivity : AppCompatActivity() {
         binding.rvMessages.adapter = adapter
 
         binding.btnSend.setOnClickListener { onSendClicked() }
+        binding.btnAttach.setOnClickListener { pickFileLauncher.launch("*/*") }
 
         loadMessages()
     }
 
-    private fun loadMessages() {
+    override fun onResume() {
+        super.onResume()
+        startPolling()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        pollJob?.cancel()
+    }
+
+    /** Поки чат відкритий — тихо перевіряємо нові повідомлення кожні кілька секунд.
+     *  Це не "справжній" push (events), але просто й надійно вирішує ситуацію, коли
+     *  відповідь від бота/співрозмовника з'являється в офіційному Telegram, а в lgram
+     *  немає, поки не відкриєш чат заново. */
+    private fun startPolling() {
+        pollJob?.cancel()
+        pollJob = lifecycleScope.launch {
+            while (isActive) {
+                delay(4000)
+                loadMessages(silent = true)
+            }
+        }
+    }
+
+    private fun loadMessages(silent: Boolean = false) {
         lifecycleScope.launch {
             val json = TelethonBridge.getMessages(accountId, chatId)
             val messages = ChatMessage.listFromJson(json).sortedBy { it.id }
+            val ids = messages.map { it.id }
+            if (silent && ids == lastMessageIds) return@launch // нічого не змінилось — не смикаємо список
+            lastMessageIds = ids
             adapter.update(messages)
             if (messages.isNotEmpty()) binding.rvMessages.scrollToPosition(messages.size - 1)
         }
@@ -78,9 +121,71 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    /** Тап по повідомленню з медіа — кешуємо (якщо ще нема) і відкриваємо системним переглядачем. */
+    // ---- Надсилання файлів ----
+
+    private fun onFilePicked(uri: Uri) {
+        Toast.makeText(this, "Підготовка файлу…", Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            val localFile = copyUriToCache(uri)
+            if (localFile == null) {
+                Toast.makeText(this@ChatActivity, "Не вдалось прочитати файл", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val result = TelethonBridge.sendFile(accountId, chatId, localFile.absolutePath)
+            if (result == "OK") {
+                loadMessages()
+            } else {
+                Toast.makeText(this@ChatActivity, "Не вдалось надіслати файл: $result", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun copyUriToCache(uri: Uri): File? {
+        return try {
+            var name = "file_${System.currentTimeMillis()}"
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && cursor.moveToFirst()) name = cursor.getString(idx)
+            }
+            val outFile = File(StorageManager.cacheDir, "outgoing_$name")
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(outFile).use { output -> input.copyTo(output) }
+            }
+            outFile
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // ---- Перегляд/відтворення медіа: НЕ качаємо автоматично все підряд ----
+
+    private fun cachedFileFor(messageId: Int): File? {
+        val dir = File(StorageManager.cacheDir, chatId.toString())
+        if (!dir.exists()) return null
+        return dir.listFiles()?.firstOrNull { it.name.startsWith("${messageId}_") }
+    }
+
+    /** Тап по медіа: якщо вже є в кеші — відкриваємо одразу (нуль зайвого трафіку).
+     *  Якщо нема — питаємо підтвердження, і тільки тоді якаємо (саме цього просили:
+     *  звичайний тап не повинен сам по собі починати качати все підряд). */
     private fun onMessageTapped(msg: ChatMessage) {
         if (msg.mediaType.isEmpty()) return
+
+        val cached = cachedFileFor(msg.id)
+        if (cached != null) {
+            openFile(cached)
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Завантажити?")
+            .setMessage("Це медіа ще не завантажене. Завантажити й відкрити зараз?")
+            .setPositiveButton("Завантажити") { _, _ -> downloadAndOpen(msg) }
+            .setNegativeButton("Скасувати", null)
+            .show()
+    }
+
+    private fun downloadAndOpen(msg: ChatMessage) {
         Toast.makeText(this, "Завантаження…", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             val cacheChatDir = File(StorageManager.cacheDir, chatId.toString())
@@ -106,22 +211,20 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun showMessageMenu(msg: ChatMessage) {
-        val options = mutableListOf("Переслати")
-        if (msg.out && msg.text.isNotBlank()) options.add("Редагувати")
-        options.add("Видалити")
-        if (msg.mediaType.isNotEmpty()) options.add("Скачати")
+    // ---- Контекстне меню (bottom sheet з іконками) ----
 
-        AlertDialog.Builder(this)
-            .setItems(options.toTypedArray()) { _, which ->
-                when (options[which]) {
-                    "Переслати" -> showForwardPicker(msg)
-                    "Редагувати" -> showEditDialog(msg)
-                    "Видалити" -> confirmDelete(msg)
-                    "Скачати" -> downloadToDownloads(msg)
-                }
-            }
-            .show()
+    private fun showMessageMenu(msg: ChatMessage) {
+        val actions = mutableListOf<ActionItem>()
+        actions.add(ActionItem("📤", "Переслати") { showForwardPicker(msg) })
+        if (msg.out && msg.text.isNotBlank()) {
+            actions.add(ActionItem("✏️", "Редагувати") { showEditDialog(msg) })
+        }
+        if (msg.mediaType.isNotEmpty()) {
+            actions.add(ActionItem("⬇️", "Скачати в Download") { downloadToDownloads(msg) })
+        }
+        actions.add(ActionItem("🗑", "Видалити", destructive = true) { confirmDelete(msg) })
+
+        ActionSheet.show(this, actions)
     }
 
     private fun showForwardPicker(msg: ChatMessage) {

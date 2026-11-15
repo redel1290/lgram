@@ -12,8 +12,8 @@ android {
         applicationId = "com.lgram.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.1.1" // синхронізовано з version.properties, не редагувати вручну
+        versionCode = 4
+        versionName = "1.2.0" // синхронізовано з version.properties, не редагувати вручну
 
         ndk {
             // armeabi-v7a + arm64-v8a покривають майже всі реальні Android-пристрої.

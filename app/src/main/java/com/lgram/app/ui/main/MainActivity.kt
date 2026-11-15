@@ -1,9 +1,9 @@
 package com.lgram.app.ui.main
 
 import android.content.Intent
-import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -13,9 +13,13 @@ import com.lgram.app.databinding.ActivityMainBinding
 import com.lgram.app.model.Account
 import com.lgram.app.model.Dialog
 import com.lgram.app.storage.AccountRegistry
+import com.lgram.app.storage.StorageManager
 import com.lgram.app.ui.auth.AuthActivity
 import com.lgram.app.ui.chat.ChatActivity
 import com.lgram.app.ui.settings.SettingsActivity
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -24,6 +28,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var accountsAdapter: AccountsAdapter
     private lateinit var chatsAdapter: ChatsAdapter
     private var activeAccountId: String? = null
+    private var showArchived = false
+    private var allDialogs: List<Dialog> = emptyList()
+    private var pollJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,12 +38,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setSupportActionBar(binding.toolbar)
-        binding.toolbar.setNavigationIcon(android.R.drawable.ic_menu_sort_by_size) // тимчасова гамбургер-іконка
+        binding.toolbar.setNavigationIcon(android.R.drawable.ic_menu_sort_by_size)
         binding.toolbar.setNavigationOnClickListener {
             binding.drawerLayout.openDrawer(Gravity.START)
         }
 
-        accountsAdapter = AccountsAdapter(emptyList()) { account -> onAccountClicked(account) }
+        accountsAdapter = AccountsAdapter(
+            emptyList(),
+            onClick = { account -> onAccountClicked(account) },
+            onAvatarMissing = { account -> fetchAccountAvatar(account) }
+        )
         binding.rvAccounts.layoutManager = LinearLayoutManager(this)
         binding.rvAccounts.adapter = accountsAdapter
 
@@ -48,7 +59,15 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
-        chatsAdapter = ChatsAdapter(emptyList()) { dialog -> onChatClicked(dialog) }
+        binding.tabAllChats.setOnClickListener { setArchiveTab(false) }
+        binding.tabArchive.setOnClickListener { setArchiveTab(true) }
+
+        chatsAdapter = ChatsAdapter(
+            emptyList(),
+            accountId = "", // оновиться разом з activeAccountId перед першим showDialogs()
+            onClick = { dialog -> onChatClicked(dialog) },
+            onAvatarMissing = { dialog -> fetchChatAvatar(dialog) }
+        )
         binding.rvChats.layoutManager = LinearLayoutManager(this)
         binding.rvChats.adapter = chatsAdapter
 
@@ -58,6 +77,31 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshAccounts()
+        startPolling()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        pollJob?.cancel()
+    }
+
+    /** Поки екран відкритий — тихо оновлюємо список чатів кожні кілька секунд,
+     *  щоб бачити нові повідомлення й без-інтернет-дружній кеш не застоювався. */
+    private fun startPolling() {
+        pollJob?.cancel()
+        pollJob = lifecycleScope.launch {
+            while (isActive) {
+                delay(5000)
+                if (activeAccountId != null) loadChats(silent = true)
+            }
+        }
+    }
+
+    private fun setArchiveTab(archived: Boolean) {
+        showArchived = archived
+        binding.tabAllChats.setTextColor(if (!archived) 0xFFFFFFFF.toInt() else 0xFF6D7883.toInt())
+        binding.tabArchive.setTextColor(if (archived) 0xFFFFFFFF.toInt() else 0xFF6D7883.toInt())
+        showDialogs()
     }
 
     private fun refreshAccounts() {
@@ -73,8 +117,6 @@ class MainActivity : AppCompatActivity() {
             supportActionBar?.title = accounts.find { it.id == activeAccountId }?.name ?: "lgram"
             loadChats()
         }
-        // Фонова перевірка живучості сесій — якщо якась відвалилась, позначаємо неактивною,
-        // АЛЕ ніколи не видаляємо файл сам по собі (це робить лише сам юзер у налаштуваннях).
         lifecycleScope.launch {
             accounts.forEach { acc ->
                 val alive = TelethonBridge.checkAuthorized(acc.id, acc.apiId, acc.apiHash)
@@ -97,23 +139,53 @@ class MainActivity : AppCompatActivity() {
         loadChats()
     }
 
-    private fun loadChats() {
+    private fun loadChats(silent: Boolean = false) {
         val accountId = activeAccountId ?: return
-        binding.tvEmptyState.text = "Завантаження чатів…"
-        binding.tvEmptyState.visibility = View.VISIBLE
-        binding.rvChats.visibility = View.GONE
+        if (!silent) {
+            binding.tvEmptyState.text = "Завантаження чатів…"
+            binding.tvEmptyState.visibility = View.VISIBLE
+            binding.rvChats.visibility = View.GONE
+        }
 
         lifecycleScope.launch {
             val json = TelethonBridge.getDialogs(accountId)
             val dialogs = Dialog.listFromJson(json)
-            if (dialogs.isEmpty()) {
-                binding.tvEmptyState.text = "Чатів не знайдено, або сталась помилка завантаження."
-                binding.tvEmptyState.visibility = View.VISIBLE
-                binding.rvChats.visibility = View.GONE
-            } else {
-                binding.tvEmptyState.visibility = View.GONE
-                binding.rvChats.visibility = View.VISIBLE
-                chatsAdapter.update(dialogs)
+            allDialogs = dialogs
+            showDialogs()
+        }
+    }
+
+    private fun showDialogs() {
+        val accountId = activeAccountId ?: return
+        val filtered = allDialogs.filter { it.isArchived == showArchived }
+        if (filtered.isEmpty()) {
+            binding.tvEmptyState.text = if (showArchived) "Архів порожній" else "Чатів не знайдено"
+            binding.tvEmptyState.visibility = View.VISIBLE
+            binding.rvChats.visibility = View.GONE
+        } else {
+            binding.tvEmptyState.visibility = View.GONE
+            binding.rvChats.visibility = View.VISIBLE
+            chatsAdapter.updateAccountAndList(accountId, filtered)
+        }
+    }
+
+    private fun fetchChatAvatar(dialog: Dialog) {
+        val accountId = activeAccountId ?: return
+        lifecycleScope.launch {
+            val dest = StorageManager.avatarFileFor(accountId, dialog.id.toString())
+            val result = TelethonBridge.downloadAvatar(accountId, dialog.id.toString(), dest.absolutePath)
+            if (result != "NONE" && !result.startsWith("ERROR:")) {
+                chatsAdapter.notifyDataSetChanged()
+            }
+        }
+    }
+
+    private fun fetchAccountAvatar(account: Account) {
+        lifecycleScope.launch {
+            val dest = StorageManager.avatarFileFor(account.id, "me")
+            val result = TelethonBridge.downloadAvatar(account.id, "me", dest.absolutePath)
+            if (result != "NONE" && !result.startsWith("ERROR:")) {
+                accountsAdapter.notifyDataSetChanged()
             }
         }
     }

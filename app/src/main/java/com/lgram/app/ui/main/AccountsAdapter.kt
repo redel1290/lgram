@@ -8,11 +8,16 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.lgram.app.databinding.ItemAccountBinding
 import com.lgram.app.model.Account
+import com.lgram.app.storage.StorageManager
+import com.lgram.app.ui.loadCircularAvatarIfExists
 
 class AccountsAdapter(
     private var accounts: List<Account>,
-    private val onClick: (Account) -> Unit
+    private val onClick: (Account) -> Unit,
+    private val onAvatarMissing: (Account) -> Unit = {}
 ) : RecyclerView.Adapter<AccountsAdapter.VH>() {
+
+    private val requestedAvatars = HashSet<String>()
 
     inner class VH(val binding: ItemAccountBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -38,6 +43,14 @@ class AccountsAdapter(
         }
         // неактивна сесія — сіріший/тьмяніший кружечок, щоб візуально відрізнялась
         bg.setColor(if (acc.active) color else Color.parseColor("#4A5560"))
+
+        holder.binding.ivAvatar.visibility = android.view.View.GONE
+        holder.binding.tvAvatar.visibility = android.view.View.VISIBLE
+        val avatarFile = StorageManager.avatarFileFor(acc.id, "me")
+        val loaded = loadCircularAvatarIfExists(avatarFile, holder.binding.ivAvatar, holder.binding.tvAvatar)
+        if (!loaded && acc.active && requestedAvatars.add(acc.id)) {
+            onAvatarMissing(acc)
+        }
 
         holder.binding.root.setOnClickListener { onClick(acc) }
     }

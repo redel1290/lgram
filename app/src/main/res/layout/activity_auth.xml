@@ -25,16 +25,6 @@
         android:layout_marginBottom="12dp"
         android:visibility="gone" />
 
-    <!-- Назва акаунта в lgram (для твоєї власної зручності, не для Telegram) -->
-    <EditText
-        android:id="@+id/etAccountName"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Назва акаунта в lgram (напр. «Мій», «Олег»)"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#6D7883"
-        android:layout_marginBottom="12dp" />
-
     <!-- Крок 1: телефон -->
     <LinearLayout
         android:id="@+id/stepPhone"

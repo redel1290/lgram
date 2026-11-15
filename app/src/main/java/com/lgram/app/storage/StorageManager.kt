@@ -27,13 +27,14 @@ object StorageManager {
     val downloadsDir: File get() = File(root, "downloads")
     val cacheDir: File get() = File(root, "cache")
     val logsDir: File get() = File(root, "logs")
+    val avatarsDir: File get() = File(cacheDir, "avatars")
 
     val accountsRegistryFile: File get() = File(configDir, "accounts.json")
     val credentialsFile: File get() = File(configDir, "credentials.json")
 
     /** Викликати один раз при старті застосунку — створює всю структуру, якщо її ще нема. */
     fun ensureStructure() {
-        listOf(root, accountsDir, configDir, downloadsDir, cacheDir, logsDir).forEach {
+        listOf(root, accountsDir, configDir, downloadsDir, cacheDir, logsDir, avatarsDir).forEach {
             if (!it.exists()) it.mkdirs()
         }
     }
@@ -51,6 +52,11 @@ object StorageManager {
     }
 
     fun accountDirFor(accountId: String): File = File(accountsDir, accountId)
+
+    /** Файл кешованої аватарки — одноразово качається і більше не чіпається,
+     *  поки хтось явно не очистить кеш (економія трафіку й часу). */
+    fun avatarFileFor(accountId: String, key: String): File =
+        File(avatarsDir, "${accountId}_${key}.jpg")
 
     fun log(tag: String, message: String) {
         try {

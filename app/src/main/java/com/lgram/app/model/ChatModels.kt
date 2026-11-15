@@ -9,7 +9,8 @@ data class Dialog(
     val lastMessage: String,
     val lastDate: Long,
     val unreadCount: Int,
-    val isGroup: Boolean
+    val isGroup: Boolean,
+    val isArchived: Boolean = false
 ) {
     companion object {
         fun listFromJson(json: String): List<Dialog> {
@@ -23,7 +24,8 @@ data class Dialog(
                         lastMessage = o.optString("lastMessage", ""),
                         lastDate = o.optLong("lastDate", 0),
                         unreadCount = o.optInt("unreadCount", 0),
-                        isGroup = o.optBoolean("isGroup", false)
+                        isGroup = o.optBoolean("isGroup", false),
+                        isArchived = o.optBoolean("archived", false)
                     )
                 }
             } catch (e: Exception) {
